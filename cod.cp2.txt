@@ -1,0 +1,192 @@
+#include <LiquidCrystal.h>
+
+//************************************************************************
+// Mapeamento dos pinos
+//************************************************************************
+int led_vermelho =  9;  // LED vermelho no pino 9
+int led_amarelo  = 10;  // LED amarelo no pino 10
+int led_verde    = 11;  // LED verde no pino 11
+int ldr          = A0;  // LDR no pino A0
+int buzininha    = 7;   // Buzina no pino 7
+int SensorTemp   = A2;  // Sensor de temperatura no pino A2
+int umid         = A1;  // Sensor de umidade no pino A1
+
+LiquidCrystal LCD (13,12,5,4,3,2); // LCD nos pinos 13, 12, 5, 4, 3 e 2
+
+//************************************************************************
+// Variaveis
+//************************************************************************
+int valorldr = 0; 
+int freq = 5;
+int SensorTempTensao = 0;
+unsigned long ultimoupdate = 0;
+unsigned long tempodelay = 5000;
+int estado = 0;
+
+float Tensao = 0;
+float TemperaturaC = 0;
+int valorU  = 0;
+int umidade = 0;
+
+//************************************************************************
+// Funcao de configuracao dos pinos e perifericos
+//************************************************************************
+void setup(){
+	LCD.begin(16,2);
+	pinMode (led_vermelho, OUTPUT);  
+	pinMode (led_amarelo, OUTPUT);
+	pinMode (led_verde, OUTPUT);
+	pinMode (buzininha, OUTPUT);
+	pinMode (ldr, INPUT);
+	pinMode (umid, INPUT);
+	Serial.begin(9600);
+}
+
+//************************************************************************
+// Funcao principal - ela vai ficar em loop executando direto
+//************************************************************************
+void loop(){
+
+	// A primeira coisa que precisamos fazer é ler os sensores
+	ler_sensores();
+	
+	// A segunda coisa que precisamos fazer é verificar se as leituras estao OK
+	verifica_sensores();
+	
+	// Por fim, precisamos mostrar a mensagem no LCD
+	mostra_mensagem();
+}
+
+//************************************************************************
+// Funcao de leitura dos sensores
+//************************************************************************
+void ler_sensores(){
+
+	//Lê o valor do sensor ldr e armazena na variável valorldr
+	valorldr = analogRead (ldr); 
+	Serial.print("LDR: ");   
+	Serial.println(valorldr);
+   
+	SensorTempTensao = analogRead (SensorTemp);
+  
+	//Converte a tensao lida
+	Tensao = SensorTempTensao * 5;
+	Tensao/=1024;
+
+    // Converte a tensao lida em Graus Celsius
+	TemperaturaC = (Tensao-0.5)*100;
+   	Serial.print("Temperatura: ");
+	Serial.println(TemperaturaC);
+	
+	valorU = analogRead(umid); //faz o valor de umidade
+	umidade = map(valorU, 0, 1023, 0, 100); //transforma o valor do potenciometro em uma escala até 100
+	Serial.print("Umidade: ");
+	Serial.println(umidade);
+}
+
+//************************************************************************
+// Funcao para avaliar as leituras dos sensores e acionar os leds/buzina
+//************************************************************************
+void verifica_sensores(){
+	
+	// Vamos verificar as condicoes dos sensores
+	if(valorldr <= 700){
+		digitalWrite(led_verde, HIGH);
+		digitalWrite(led_amarelo, LOW);
+		digitalWrite(led_vermelho, LOW);
+	}
+	if(((valorldr > 700) && (valorldr <= 900)) || ((TemperaturaC < 10) || (TemperaturaC > 15))){
+		digitalWrite(led_verde, LOW);
+		digitalWrite(led_amarelo, HIGH);
+		digitalWrite(led_vermelho, LOW);
+   }
+   if(((valorldr) > 900 || ((umidade > 80) || (umidade < 50)))){
+		digitalWrite(led_verde, LOW);
+		digitalWrite(led_amarelo, LOW);
+		digitalWrite(led_vermelho, HIGH);
+   }
+}
+
+//************************************************************************
+// Funcao para mostrar as mensagens no LCD
+//************************************************************************
+void mostra_mensagem(){
+	
+	// A mesagem precisa ser atualizada a cada 5 segundos, entao vamos usar a funcao millis para isso:
+	int agora = millis();
+	
+	// Verifica se ja passou 5 segundos
+	if((agora - ultimoupdate) >= tempodelay){
+		//impressão no LCD
+		switch (estado){
+			case 0:
+			LCD.setCursor(0, 1); //coloca valores para a segunda linha
+			LCD.print("Temp. = "); 
+			LCD.print(TemperaturaC);
+			LCD.print(" C ");
+			LCD.setCursor(0, 0);
+			if (TemperaturaC <= 10) { //da condição de como vai ser a primeira
+				LCD.print("Temp. BAIXA     ");
+				}
+			else if (TemperaturaC <= 15) {
+				LCD.print("Temperatura MEDIA");
+				}
+			else if (TemperaturaC >= 15) {
+				LCD.print("Temperatura ALTA");
+				}
+			break;
+			case 1:
+			LCD.clear();
+			LCD.setCursor(0,0); 
+			if (valorldr <= 700){ 
+				LCD.print("Luz ambiente OK");
+				}
+			else if (valorldr <= 900){
+				LCD.print("Ambiente a Meia");
+				LCD.setCursor(0,1);
+				LCD.print("luz");
+				}
+			else if (valorldr >900){
+				LCD.print("Ambiente muito");
+				LCD.setCursor(0,1);
+				LCD.print("claro");
+				} 
+			break;
+			case 2:
+			LCD.clear();
+			LCD.setCursor(0, 1);
+			LCD.print("Umid. = ");
+			LCD.print(umidade);
+			LCD.print(" % ");
+			LCD.setCursor(0, 0);
+			if (umidade <= 60) {
+				LCD.print("Umidade Baixa  ");
+				}
+		
+			else if (umidade <= 70) {
+				LCD.print("Umidade Media  ");
+				}
+		
+			else if (umidade >= 80) {
+				LCD.print("Umidade Alta    ");
+				}
+			break;
+		}
+		
+		//atualiza a variavel de estado
+		estado++;
+		if(estado > 2){
+			estado = 0;
+		}
+		
+		//atualiza o tempo para só mudar de novo daqui a 5 segundos
+		ultimoupdate = millis();
+	}
+Serial.println(agora);
+}
+
+
+
+
+
+
